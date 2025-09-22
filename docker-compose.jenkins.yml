@@ -1,0 +1,25 @@
+services:
+  dind:
+    image: docker:27-dind
+    privileged: true
+    environment:
+      DOCKER_TLS_CERTDIR: ""     # disable TLS for local use
+    volumes:
+      - dind_storage:/var/lib/docker
+
+  jenkins:
+    image: jenkins/jenkins:lts
+    user: root                   # needed to talk to DinD
+    environment:
+      DOCKER_HOST: tcp://dind:2375
+    ports:
+      - "8080:8080"
+      - "50001:50001"
+    volumes:
+      - jenkins_home:/var/jenkins_home
+    depends_on:
+      - dind
+
+volumes:
+  jenkins_home:
+  dind_storage:
