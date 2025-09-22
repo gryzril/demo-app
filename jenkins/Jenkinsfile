@@ -81,19 +81,38 @@ pipeline {
         }
       }
 
-      stage('Terraform Apply') {
-          steps {
-             withCredentials([usernamePassword(credentialsId: 'aws', usernameVariable: 'AWS_ACCESS_KEY_ID', passwordVariable: 'AWS_SECRET_ACCESS_KEY')]) {
-                  dir('terraform') {
-                    sh '''
-                      terraform init -input=false
-                      terraform apply -auto-approve -input=false \
-                        -var="backend_image_tag=${IMAGE_TAG}" \
-                        -var="db_image_tag=latest"
-                    '''
-                  }
+      stage('Terraform Plan') {
+        environment { AWS_DEFAULT_REGION = "${AWS_REGION ?: 'us-east-1'}" }
+        steps {
+          withCredentials([usernamePassword(credentialsId: 'aws', usernameVariable: 'AWS_ACCESS_KEY_ID', passwordVariable: 'AWS_SECRET_ACCESS_KEY')]) {
+            script {
+              def rc = sh(returnStatus: true, script: '''
+                : "${IMAGE_TAG:=local}"
+                docker run --rm \
+                  -e AWS_ACCESS_KEY_ID -e AWS_SECRET_ACCESS_KEY -e AWS_DEFAULT_REGION \
+                  -v "${SRC}/terraform:/tf" -w /tf hashicorp/terraform:1.9.5 \
+                  sh -lc 'terraform init -input=false -no-color &&
+                          terraform plan -input=false -no-color -out=tfplan \
+                            -var="backend_image_tag='${IMAGE_TAG}'" \
+                            -var="db_image_tag=latest" \
+                            -detailed-exitcode'
+              ''')
+              sh '''
+                docker run --rm \
+                  -v "${SRC}/terraform:/tf" -w /tf hashicorp/terraform:1.9.5 \
+                  terraform show -no-color tfplan || true
+              '''
+              if (rc == 0) {
+                echo 'No changes.'
+              } else if (rc == 2) {
+                echo 'Changes detected (plan only, not applied).'
+                currentBuild.result = 'UNSTABLE'
+              } else {
+                error 'Terraform plan failed.'
               }
+            }
           }
+        }
       }
 
       stage('Push to ECR') {
