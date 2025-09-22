@@ -1,6 +1,10 @@
-.pdf
-.txt
+*.pdf
+*.txt
 __pycache__
 .terraform.lock.hcl
 .terraform
 .tfstate
+
+.venv
+
+.vscode
