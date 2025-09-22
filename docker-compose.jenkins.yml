@@ -2,13 +2,21 @@ services:
   dind:
     image: docker:27-dind
     privileged: true
+    init: true
+    command: ["--tls=false","--host=tcp://0.0.0.0:2375","--host=unix:///var/run/docker.sock"]
     environment:
       DOCKER_TLS_CERTDIR: ""     # disable TLS for local use
+    healthcheck: { test: ["CMD","docker","info"], interval: 10s, timeout: 5s, retries: 6 }
     volumes:
       - dind_storage:/var/lib/docker
+      - ./:/workspace/demo-app:ro
+      - type: tmpfs
+        target: /run
+      - type: tmpfs
+        target: /var/run
 
   jenkins:
-    image: jenkins/jenkins:lts
+    build: ./jenkins
     user: root                   # needed to talk to DinD
     environment:
       DOCKER_HOST: tcp://dind:2375
@@ -17,6 +25,7 @@ services:
       - "50001:50001"
     volumes:
       - jenkins_home:/var/jenkins_home
+      - ./:/workspace/demo-app:rw
     depends_on:
       - dind
 
