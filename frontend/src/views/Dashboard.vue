@@ -14,35 +14,41 @@
       <Column field="due_date" header="Due">
         <template #body="{ data }">{{ fmtDate(data.due_date) }}</template>
       </Column>
-      <Column header="Actions" style="width: 10rem">
+      <Column header="Actions" style="width:10rem; min-width:8rem">
         <template #body="{ data }">
-          <Button icon="pi pi-trash" severity="danger" text rounded @click="remove(data.id)" />
+          <div class="flex justify-center">
+            <Button
+              icon="pi pi-trash"
+              severity="danger"
+              variant="outlined"
+              rounded
+              @click="remove(data.id)"
+            />
+          </div>
         </template>
       </Column>
     </DataTable>
 
     <Dialog v-model:visible="showCreate" header="Create Task" modal :style="{ width: '32rem' }">
-      <div class="space-y-4">
-        <div>
-          <label class="block text-sm mb-1">Title</label>
-          <InputText v-model="form.title" class="w-full" />
-        </div>
-        <div>
-          <label class="block text-sm mb-1">Description</label>
-          <InputTextarea v-model="form.description" class="w-full" rows="3" />
-        </div>
-        <div>
-          <label class="block text-sm mb-1">Status</label>
-          <Dropdown v-model="form.status" :options="statuses" optionLabel="label" optionValue="value" class="w-full" />
-        </div>
-        <div>
-          <label class="block text-sm mb-1">Due date</label>
-          <Calendar v-model="form.due_date" showIcon class="w-full" />
-        </div>
+      <div class="form-grid">
+        <label for="title">Title</label>
+        <InputText id="title" v-model="form.title" />
+
+        <label for="desc">Description</label>
+        <Textarea id="desc" v-model="form.description" rows="3" />
+
+        <label for="status">Status</label>
+        <Dropdown id="status" v-model="form.status" :options="statuses" optionLabel="label" optionValue="value" />
+
+        <label for="due">Due date</label>
+        <Calendar id="due" v-model="form.due_date" showIcon />
       </div>
+
       <template #footer>
-        <Button label="Cancel" severity="secondary" @click="showCreate = false" />
-        <Button label="Create" :loading="creating" @click="create()" />
+        <div class="w-full flex justify-end gap-2">
+          <Button label="Cancel" severity="secondary" @click="showCreate = false" />
+          <Button label="Create" :loading="creating" @click="create()" />
+        </div>
       </template>
     </Dialog>
   </div>
@@ -56,20 +62,11 @@ import DataTable from "primevue/datatable";
 import Column from "primevue/column";
 import Dialog from "primevue/dialog";
 import InputText from "primevue/inputtext";
-//import InputTextarea from "primevue/inputtextarea";
+import Textarea from "primevue/textarea"
 import Dropdown from "primevue/dropdown";
 import Calendar from "primevue/calendar";
-// import { api } from "@/api/client";
-
-type Task = {
-  id: number;
-  title: string;
-  description?: string | null;
-  status: "todo" | "doing" | "done";
-  due_date?: string | null;
-  created_at?: string;
-  updated_at?: string;
-};
+import { getAllTasks, getTask, createTask, updateTask, deleteTask } from "@/api/tasks"
+import type { TaskCreate, TaskUpdate, Status, Task } from "@/api/entities/Tasks";
 
 const toast = useToast();
 const tasks = ref<Task[]>([]);
@@ -90,68 +87,59 @@ const form = ref<{ title: string; description?: string; status: Task["status"]; 
   due_date: null,
 });
 
-function authHeaders() {
-  const t = localStorage.getItem("access_token");
-  return t ? { Authorization: `Bearer ${t}` } : {};
+async function load() {
+  loading.value = true;
+  try {
+    const data = await getAllTasks();
+    tasks.value = data;
+  } catch (err: any) {
+    toast.add({ severity: "error", summary: "Load failed", detail: err?.message ?? "Error" });
+  } finally {
+    loading.value = false;
+  }
 }
-
-// async function load() {
-//   loading.value = true;
-//   try {
-//     const data = await api<Task[]>("/tasks", { headers: { ...authHeaders() } });
-//     tasks.value = data;
-//   } catch (err: any) {
-//     toast.add({ severity: "error", summary: "Load failed", detail: err?.message ?? "Error" });
-//   } finally {
-//     loading.value = false;
-//   }
-// }
 
 function openCreate() {
   form.value = { title: "", description: "", status: "todo", due_date: null };
   showCreate.value = true;
 }
 
-// async function create() {
-//   if (!form.value.title) {
-//     toast.add({ severity: "warn", summary: "Title required" });
-//     return;
-//   }
-//   creating.value = true;
-//   const payload = {
-//     title: form.value.title,
-//     description: form.value.description || null,
-//     status: form.value.status,
-//     due_date: form.value.due_date ? form.value.due_date.toISOString() : null,
-//     label_ids: [] as number[],
-//   };
-//   try {
-//     const t = await api<Task>("/tasks", {
-//       method: "POST",
-//       headers: { ...authHeaders() },
-//       body: JSON.stringify(payload),
-//     });
-//     tasks.value = [t, ...tasks.value]; // optimistic insert
-//     showCreate.value = false;
-//     toast.add({ severity: "success", summary: "Task created" });
-//   } catch (err: any) {
-//     toast.add({ severity: "error", summary: "Create failed", detail: err?.message ?? "Error" });
-//   } finally {
-//     creating.value = false;
-//   }
-// }
+async function create() {
+  if (!form.value.title) {
+    toast.add({ severity: "warn", summary: "Title required" });
+    return;
+  }
+  creating.value = true;
+  const payload: TaskCreate = {
+    title: form.value.title,
+    description: form.value.description || null,
+    status: form.value.status,
+    due_date: form.value.due_date ? form.value.due_date.toISOString() : null,
+    label_ids: [] as number[],
+  };
+  try {
+    const t = await createTask(payload)
+    tasks.value = [t, ...tasks.value]; // optimistic insert
+    showCreate.value = false;
+    toast.add({ severity: "success", summary: "Task created" });
+  } catch (err: any) {
+    toast.add({ severity: "error", summary: "Create failed", detail: err?.message ?? "Error" });
+  } finally {
+    creating.value = false;
+  }
+}
 
-// async function remove(id: number) {
-//   const prev = tasks.value.slice();
-//   tasks.value = tasks.value.filter((x) => x.id !== id);
-//   try {
-//     await api<void>(`/tasks/${id}`, { method: "DELETE", headers: { ...authHeaders() } });
-//     toast.add({ severity: "info", summary: "Task deleted" });
-//   } catch (err: any) {
-//     tasks.value = prev; // rollback
-//     toast.add({ severity: "error", summary: "Delete failed", detail: err?.message ?? "Error" });
-//   }
-// }
+async function remove(id: number) {
+  const prev = tasks.value.slice();
+  tasks.value = tasks.value.filter((x) => x.id !== id);
+  try {
+    await deleteTask(id);
+    toast.add({ severity: "info", summary: "Task deleted" });
+  } catch (err: any) {
+    tasks.value = prev; // rollback
+    toast.add({ severity: "error", summary: "Delete failed", detail: err?.message ?? "Error" });
+  }
+}
 
 function fmtDate(s?: string | null) {
   if (!s) return "";
@@ -159,5 +147,22 @@ function fmtDate(s?: string | null) {
   return d.toLocaleDateString();
 }
 
-// onMounted(load);
+onMounted(load);
 </script>
+
+<style scoped>
+.form-grid {
+  display: grid;
+  grid-template-columns: 110px 1fr;
+  align-items: center;
+  row-gap: 14px;
+  column-gap: 12px;
+}
+.form-grid :deep(.p-inputtext),
+.form-grid :deep(.p-textarea),
+.form-grid :deep(.p-dropdown),
+.form-grid :deep(.p-calendar),
+.form-grid :deep(.p-inputwrapper) {
+  width: 100%;
+}
+</style>

@@ -8,7 +8,6 @@ def ensure_schema(create_extensions: bool = False):
         Base.metadata.create_all(bind=engine, checkfirst=True)
         print("Schema created successfully.")
         
-        # TODO what create extensions do?
         if create_extensions:
             with engine.begin() as conn:
                 conn.exec_driver_sql('CREATE EXTENSION IF NOT EXISTS "uuid-ossp";')

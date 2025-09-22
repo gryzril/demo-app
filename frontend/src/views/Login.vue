@@ -29,7 +29,7 @@ import Card from "primevue/card";
 import Button from "primevue/button";
 import InputText from "primevue/inputtext";
 import Password from "primevue/password";
-//import { api } from "@/api/client";
+import { login } from "@/api/client";
 
 const router = useRouter();
 const toast = useToast();
@@ -45,12 +45,9 @@ async function onSubmit() {
   }
   loading.value = true;
   try {
-    // const res = await api<{ access_token: string }>("/auth/login", {
-    //   method: "POST",
-    //   body: JSON.stringify({ email: email.value, password: password.value }),
-    // });
-    // localStorage.setItem("access_token", res.access_token);
-    // toast.add({ severity: "success", summary: "Signed in" });
+    const res = await login(email.value, password.value)
+    localStorage.setItem("access_token", res.access_token);
+    toast.add({ severity: "success", summary: "Signed in" });
     router.push("/dashboard");
   } catch (err: any) {
     toast.add({ severity: "error", summary: "Login failed", detail: err?.message ?? "Error" });

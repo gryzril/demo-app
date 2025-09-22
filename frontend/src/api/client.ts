@@ -1,25 +1,26 @@
-import { type User } from "./entities/user"
+import type { LoginResponse } from "./entities/LoginResponse";
+import { type User } from "./entities/User"
 
 const BASE_URL = (import.meta.env.VITE_API_BASE_URL ?? "http://backend:8000").replace(/\/+$/,"");
 const ACCESS_KEY = "access_token";
 
 /* Auth Handling Helper Methods */
 
-const getAccessToken = () => localStorage.getItem(ACCESS_KEY);
+export const getAccessToken = () => localStorage.getItem(ACCESS_KEY);
 
-function setAccessToken(token: string | null) {
+export function setAccessToken(token: string | null) {
   if (token) localStorage.setItem(ACCESS_KEY, token);
   else localStorage.removeItem(ACCESS_KEY);
 }
 
 /* API Helper Methods */
 
-function joinUrl(path: string): string {
+export function joinUrl(path: string): string {
   if (path.startsWith("http://") || path.startsWith("https://")) return path;
   return `${BASE_URL}${path.startsWith("/") ? path : `/${path}`}`;
 }
 
-function jsonHeaders(init?: RequestInit): HeadersInit {
+export function jsonHeaders(init?: RequestInit): HeadersInit {
   return {
     "Content-Type": "application/json",
     ...(init?.headers || {}),
@@ -29,7 +30,7 @@ function jsonHeaders(init?: RequestInit): HeadersInit {
 
 /* API Methods */
 
-async function login(email: string, password: string): Promise<LoginResponse> {
+export async function login(email: string, password: string): Promise<LoginResponse> {
   const payload = ({ email, password });
   
   const response = await fetch(`${BASE_URL}/auth/login`, {
@@ -49,7 +50,7 @@ async function login(email: string, password: string): Promise<LoginResponse> {
   return data;
 }
 
-async function refreshToken(): Promise<string | null> {
+export async function refreshToken(): Promise<string | null> {
   try {
     const response = await fetch(`${BASE_URL}/auth/refresh`, {
       method: "POST",
@@ -74,7 +75,7 @@ async function refreshToken(): Promise<string | null> {
  * @param token JTW Auth Token
  * @returns Fetch /me results
  */
-function fetchMe(token?: string): Promise<Response> {
+export function fetchMe(token?: string): Promise<Response> {
   const headers: HeadersInit = token ? { Authorization: `Bearer ${token}` } : {};
   return fetch(`${BASE_URL}/me`, { credentials: "include", headers });
 }
@@ -83,7 +84,7 @@ function fetchMe(token?: string): Promise<Response> {
  * Get User Information. If initial fetch fails, refresh token
  * @returns User Object
  */
-async function me(): Promise<User> {
+export async function me(): Promise<User> {
   const currentCreds = await fetchMe(getAccessToken() ?? undefined)
 
   if (currentCreds.ok) {

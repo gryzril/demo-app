@@ -1,6 +1,7 @@
 import { createRouter, createWebHistory, type RouteRecordRaw } from 'vue-router';
-import Dashboard from '../views/Dashboard.vue';
-import Login from '../views/Login.vue';
+
+const Login = () => import('@/views/Login.vue');
+const Dashboard = () => import('@/views/Dashboard.vue');
 
 const routes: Array<RouteRecordRaw> = [
   {

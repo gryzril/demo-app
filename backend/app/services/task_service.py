@@ -19,3 +19,10 @@ def get_task_by_id(db: Session, task_id: int):
 
 def get_all_tasks(db: Session, skip: int = 0, limit: int = 100):
     return db.query(models.Task).offset(skip).limit(limit).all()
+
+def delete_task_by_id(db: Session, task_id: int) -> None:
+    task = db.get(models.Task, task_id)
+    if task is None:
+        raise HTTPException(status_code=404, detail="Task not found")
+    db.delete(task)
+    db.commit()
