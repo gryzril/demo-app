@@ -2,8 +2,7 @@ pipeline {
   agent any
 
   environment {
-      AWS_ACCESS_KEY_ID     = credentials('aws').usr
-      AWS_SECRET_ACCESS_KEY = credentials('aws').psw
+      AWS_REGION  = 'us-east-1'
       DOCKER_HOST = 'tcp://dind:2375'
       ECR_BACKEND   = "demo-app-backend"
       ECR_FRONTEND  = "demo-app-frontend"
@@ -13,8 +12,7 @@ pipeline {
 
   stages {
       stage('Checkout') {
-          agent any
-          steps { checkout([$class: 'GitSCM', userRemoteConfigs: [[url: 'https://github.com/gryzril/demo-app.git']]]) }
+        steps { git 'https://github.com/gryzril/demo-app.git' }
       }
 
       stage('Set Image Tag') {
@@ -28,36 +26,35 @@ pipeline {
       }
 
       stage('Backend unit tests') {
-        agent { docker { image 'python:3.12' } }
         steps {
-          sh '''
-            pip install -U pip
-            pip install -r backend/requirements.txt
-            pytest backend/tests -q
-          '''
+            sh '''
+              docker run --rm -v "$PWD:/w" -w /w python:3.12 bash -lc "
+                pip install -U pip &&
+                pip install -r backend/requirements.txt &&
+                pytest backend/tests -q
+              "
+            '''
         }
       }
 
       stage('Run Playwright Tests') {
-          agent { docker { image 'mcr.microsoft.com/playwright:v1.47.2-jammy' } }
           steps {
-              dir('frontend') {
-                sh '''
-                  npm ci
-                  npx playwright install --with-deps
-                  npx playwright test
-                '''
-              }
+            sh '''
+              docker run --rm -v "$PWD/frontend:/app" -w /app mcr.microsoft.com/playwright:v1.47.2-jammy bash -lc "
+                npm ci &&
+                npx playwright install --with-deps &&
+                npx playwright test
+              "
+            '''
           }
       }
 
       stage('Build Docker images') {
-          agent any
           steps {
-              script {
-                docker.build("backend:${env.IMAGE_TAG}", 'backend')
-                docker.build("frontend:${env.IMAGE_TAG}", 'frontend')
-              }
+            sh '''
+              docker build -t backend:${IMAGE_TAG}  backend
+              docker build -t frontend:${IMAGE_TAG} frontend
+            '''
           }
       }
 
